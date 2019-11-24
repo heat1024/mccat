@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/heat1024/mccat/mccat"
+	mccat "github.com/heat1024/mccat/memcache-cat"
 )
 
 var url string
