@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/pkg/term"
+	"github.com/c-bata/go-prompt"
 )
 
 const (
@@ -161,11 +162,6 @@ func parseCmd(cmd string) (*cmds, error) {
 
 func usage() {
 	fmt.Println("Command list")
-	// fmt.Println("  --name[-n] {key_name}     : get all data in memcached server only starts with key_name.")
-	// fmt.Println("  --vname[-vn] {key_name}   : get all data in memcached server only starts without key_name.")
-	// fmt.Println("  --grep[-g] {grep_words}   : get all data in memcached server only contain grep_words.")
-	// fmt.Println("  --vgrep[-vg] {grep_words} : get all data in memcached server only not contain grep_words.")
-	// fmt.Println("  --count[-c]               : only display the number of keys that meet the conditions.")
 	fmt.Println("> get key [key2] [key3] ...                                             : get data from server")
 	fmt.Println("> set key ttl                                                           : set data (overwrite when exist)")
 	fmt.Println("> add key ttl                                                           : add new data (error when key exist)")
@@ -178,9 +174,25 @@ func usage() {
 	fmt.Println("> help                                                                  : show usage")
 }
 
+func completer(d prompt.Document) []prompt.Suggest {
+	s := []prompt.Suggest{
+		{Text: "get", Description: "Get data from server"},
+		{Text: "set", Description: "Set data (overwrite when exist)"},
+		{Text: "add", Description: "Add new data (error when key exist)"},
+		{Text: "append", Description: "Append data from exist data"},
+		{Text: "prepend", Description: "Prepend data from exist data"},
+		{Text: "incr", Description: "Increase numeric value"},
+		{Text: "decr", Description: "Decrease numeric value"},
+		{Text: "del", Description: "Remove key item from server"},
+		{Text: "getall", Description: "Get all items from server (can grep by namespace or key words)"},
+		{Text: "help", Description: "Show usage"},
+		{Text: "quit", Description: "Terminate the mccat"},
+	}
+	return prompt.FilterHasPrefix(s, d.GetWordBeforeCursor(), true)
+}
+
 // New make connection to provided address:port
 // and returns a memcache client.
-// socket read/write timeout (default: 1 hours)
 func New(url string) (*Client, error) {
 	nc, err := net.Dial("tcp", fmt.Sprintf("%s", url))
 	if err != nil {
@@ -204,7 +216,7 @@ func New(url string) (*Client, error) {
 // Start function is start mccat console
 func Start(url string) error {
 	// connect to memcached server
-	fmt.Printf("connect to %s\r\n", url)
+	fmt.Printf("connect to %s\n", url)
 
 	nc, err := New(url)
 	if err != nil {
@@ -213,10 +225,8 @@ func Start(url string) error {
 	defer nc.Close()
 
 	for {
-		cmd, err := nc.readCmdInput()
-		if err != nil {
-			return fmt.Errorf("error on input commands: %s", err.Error())
-		}
+		cmd := prompt.Input(fmt.Sprintf("%s> ", url), completer)
+
 		if len(nc.cmdHisroty) == 0 || nc.cmdHisroty[len(nc.cmdHisroty)-1] != cmd {
 			nc.cmdHisroty = append(nc.cmdHisroty, cmd)
 		}
@@ -231,14 +241,14 @@ func Start(url string) error {
 		} else {
 			if cmds != nil {
 				if err := nc.Run(cmds); err != nil {
-					fmt.Printf("%s\r\n", err.Error())
+					fmt.Printf("%s\n", err.Error())
 				}
 			}
 		}
 
 	}
 
-	fmt.Printf("terminate mccat")
+	fmt.Printf("terminate mccat\n")
 
 	return nil
 }
@@ -250,126 +260,11 @@ func calcTTL(ttl string) int {
 
 	t, err := strconv.Atoi(ttl)
 	if err != nil {
-		fmt.Printf("ttl is wrong. use default ttl (%d)\r\n", defaultTTL)
+		fmt.Printf("ttl is wrong. use default ttl (%d)\n", defaultTTL)
 		return defaultTTL
 	}
 
 	return t
-}
-
-func refreshInputLine(url string, cmd string) {
-	var blank string
-	curCmdLength := len(cmd) + len(url) + 3
-	for i := 0; i < curCmdLength; i++ {
-		blank = blank + " "
-	}
-	fmt.Printf("\r%s", blank)
-}
-
-func getChar() (int, []byte, error) {
-	var err error
-
-	var numRead int
-	bytes := make([]byte, maxBuff)
-
-	t, _ := term.Open("/dev/tty")
-	term.RawMode(t)
-	defer func() {
-		t.Restore()
-		t.Close()
-	}()
-
-	numRead, err = t.Read(bytes)
-	if err != nil {
-		return 0, nil, fmt.Errorf("error on read input")
-	}
-
-	return numRead, bytes, err
-}
-
-func (c *Client) getCmdLine(line string) (string, error) {
-
-	historyIndex := len(c.cmdHisroty)
-	maxHistoryIndex := historyIndex - 1
-
-inputLoop:
-	for {
-		refreshInputLine(c.url, line)
-		fmt.Printf("\r%s> %s", c.url, line)
-
-		rc, buff, err := getChar()
-		if err != nil {
-			return "", err
-		}
-
-		if rc == 3 && buff[0] == 27 && buff[1] == 91 {
-			if historyIndex >= 0 {
-				if len(c.cmdHisroty) > 0 {
-					if buff[2] == 65 {
-						// Up
-						refreshInputLine(c.url, line)
-
-						if historyIndex > 0 {
-							historyIndex--
-						}
-
-						line = c.cmdHisroty[historyIndex]
-
-						fmt.Printf("\r%s> %s", c.url, line)
-					} else if buff[2] == 66 {
-						// Down
-						refreshInputLine(c.url, line)
-
-						if historyIndex < maxHistoryIndex {
-							historyIndex++
-							line = c.cmdHisroty[historyIndex]
-						} else {
-							line = ""
-						}
-
-						fmt.Printf("\r%s> %s", c.url, line)
-					}
-				}
-			}
-
-			// if buff[2] == 68 {
-			// 	// Left
-			// 	fmt.Printf("left pressed\r\n")
-			// } else if buff[2] == 67 {
-			// 	// Right
-			// 	fmt.Printf("right pressed\r\n")
-			// }
-		} else if rc == 1 {
-			switch buff[0] {
-			case 127:
-				if len(line) > 0 {
-					line = line[:len(line)-1]
-				}
-			case 13:
-				fmt.Println()
-				break inputLoop
-			case 3:
-				fmt.Println()
-				line = "exit"
-				break inputLoop
-			default:
-				line = line + string(buff[0])
-			}
-		}
-	}
-
-	return strings.TrimRight(line, "\r\n"), nil
-}
-
-func (c *Client) readCmdInput() (string, error) {
-	var cmd string = ""
-
-	line, err := c.getCmdLine(cmd)
-	if err != nil {
-		return "", err
-	}
-
-	return line, nil
 }
 
 func readValueInput() (string, error) {
@@ -396,7 +291,7 @@ func (c *Client) Run(cmds *cmds) error {
 			return err
 		}
 
-		fmt.Printf("%s: %s\r\n", item.Key, item.Value)
+		fmt.Printf("%s : %s\n", item.Key, item.Value)
 
 		break
 	case "allitems", "getall":
@@ -405,13 +300,13 @@ func (c *Client) Run(cmds *cmds) error {
 			return err
 		}
 
-		fmt.Printf("Key counts: %d\r\n", len(items))
+		fmt.Printf("Key counts: %d\n", len(items))
 
 		for _, i := range items {
 			if cmds.ops.keyOnly {
-				fmt.Printf("  - %s\r\n", i.Key)
+				fmt.Printf("  - %s\n", i.Key)
 			} else {
-				fmt.Printf("  - %s : %s\r\n", i.Key, i.Value)
+				fmt.Printf("  - %s : %s\n", i.Key, i.Value)
 			}
 		}
 
@@ -438,7 +333,7 @@ func (c *Client) Run(cmds *cmds) error {
 			return err
 		}
 
-		fmt.Printf("key %s %s complate\r\n", cmds.argv[1], cmds.argv[0])
+		fmt.Printf("key %s %s complate\n", cmds.argv[1], cmds.argv[0])
 
 		break
 	case "del", "delete", "rm", "remove":
@@ -446,7 +341,7 @@ func (c *Client) Run(cmds *cmds) error {
 			return err
 		}
 
-		fmt.Printf("key %s deleted\r\n", cmds.argv[1])
+		fmt.Printf("key %s deleted\n", cmds.argv[1])
 
 		break
 	case "incr", "decr":
@@ -463,7 +358,7 @@ func (c *Client) Run(cmds *cmds) error {
 			return err
 		}
 
-		fmt.Printf("%s: %s\r\n", cmds.argv[1], res)
+		fmt.Printf("%s: %s\n", cmds.argv[1], res)
 
 		break
 	default:
@@ -482,7 +377,7 @@ func (c *Client) Close() error {
 func (c *Client) Write(cmd string) error {
 	res := error(nil)
 
-	// set LF end of cmd line
+	// set CRLF end of cmd line (memcached recommanded)
 	cmd = strings.TrimRight(cmd, "\r\n") + "\r\n"
 
 	_, err := c.buff.Writer.WriteString(cmd)
@@ -529,7 +424,7 @@ func (c *Client) getSlabData() ([]int, error) {
 			break
 		}
 		if strings.Contains(buff, "ERROR") {
-			return nil, fmt.Errorf("got error on reading response from memcached server: %s", err.Error())
+			return nil, fmt.Errorf("got error on reading response from memcached server")
 		}
 		if strings.HasPrefix(buff, "STAT") {
 			s := strings.Split(buff, ":")
@@ -546,6 +441,106 @@ func (c *Client) getSlabData() ([]int, error) {
 	}
 
 	return slabIDs, nil
+}
+
+func (c *Client) getKeyListFromLRUCrawler() ([]string, error) {
+	var keys []string
+
+	err := c.Write("lru_crawler metadump all")
+	if err != nil {
+		return nil, err
+
+	}
+
+	for {
+		buff, err := c.Read()
+		if err != nil && err != io.EOF {
+			return nil, fmt.Errorf("failed on reading response from memcached server: %s", err.Error())
+		}
+
+		if strings.HasPrefix(buff, "END") {
+			break
+		}
+		if strings.Contains(buff, "ERROR") {
+			return nil, fmt.Errorf("lru command not supported")
+		}
+		if strings.HasPrefix(buff, "key=") {
+			encodedKey := strings.TrimPrefix(strings.SplitN(buff, " ", 2)[0], "key=")
+			key, err := url.QueryUnescape(encodedKey)
+			if err != nil {
+				continue
+			}
+			keys = append(keys, key)
+		}
+	}
+
+	return keys, nil
+}
+
+func (c *Client) getKeyListFromCachedump(SlabIDs []int) ([]string, error) {
+	var keys []string
+
+	for _, slab := range SlabIDs {
+		err := c.Write(fmt.Sprintf("stats cachedump %d 0", slab))
+		if err != nil {
+			return nil, err
+		}
+
+		for {
+			buff, err := c.Read()
+			if err != nil && err != io.EOF {
+				return nil, fmt.Errorf("failed on reading response from memcached server: %s", err.Error())
+			}
+
+			if strings.HasPrefix(buff, "END") {
+				break
+			}
+			if strings.Contains(buff, "ERROR") {
+				return nil, fmt.Errorf("got error on reading response from memcached server: %s", err.Error())
+			}
+			if strings.HasPrefix(buff, "ITEM") {
+				key := strings.Split(buff, " ")[1]
+				keys = append(keys, key)
+			}
+		}
+	}
+
+	return keys, nil
+}
+
+func checkKeyMatch(keys []string, ops options) []string {
+	var matchKey []string
+	var matchName bool
+	var matchGrep bool
+
+	for _, key := range keys {
+		ns := strings.SplitN(key, ":", 2)[0]
+
+		matchName = true
+		matchGrep = true
+
+		// if namespace defined, compare with namespace
+		if len(ops.namespace) > 0 && ns != ops.namespace {
+			matchName = false
+		}
+		// if vnamespace defined, compare with namespace
+		if len(ops.vnamespace) > 0 && ns == ops.vnamespace {
+			matchName = false
+		}
+		// if grep word defined, check about key contains words
+		if len(ops.grep) > 0 && !strings.Contains(key, ops.grep) {
+			matchGrep = false
+		}
+		// if vgrep word defined, check about key contains words
+		if len(ops.vgrep) > 0 && strings.Contains(key, ops.vgrep) {
+			matchGrep = false
+		}
+		if matchName && matchGrep {
+			matchKey = append(matchKey, key)
+		}
+	}
+
+	return matchKey
 }
 
 // Get search data by key and return by Item struct
@@ -664,62 +659,25 @@ func (c *Client) IncrDecr(cmds *cmds) (string, error) {
 
 // GetAll return all key/value data in memcached server
 func (c *Client) GetAll(ops options) ([]*Item, error) {
-	var keys []string
-	var matchName bool
-	var matchGrep bool
+	var allKeys, keys []string
 
-	SlabIDs, err := c.getSlabData()
+	// first, try lru command
+	allKeys, err := c.getKeyListFromLRUCrawler()
 	if err != nil {
-		return nil, fmt.Errorf("cannot get slab data from memcached server: %s", err.Error())
-	}
+		allKeys = nil
 
-	for _, slabID := range SlabIDs {
-		err := c.Write(fmt.Sprintf("stats cachedump %d 0", slabID))
+		SlabIDs, err := c.getSlabData()
+		if err != nil {
+			return nil, fmt.Errorf("cannot get slab data from memcached server: %s", err.Error())
+		}
+
+		allKeys, err = c.getKeyListFromCachedump(SlabIDs)
 		if err != nil {
 			return nil, err
 		}
-
-		for {
-			buff, err := c.Read()
-			if err != nil && err != io.EOF {
-				return nil, fmt.Errorf("failed on reading response from memcached server: %s", err.Error())
-			}
-
-			if strings.HasPrefix(buff, "END") {
-				break
-			}
-			if strings.Contains(buff, "ERROR") {
-				return nil, fmt.Errorf("got error on reading response from memcached server: %s", err.Error())
-			}
-			if strings.HasPrefix(buff, "ITEM") {
-				key := strings.Split(buff, " ")[1]
-				ns := strings.SplitN(key, ":", 2)[0]
-
-				matchName = true
-				matchGrep = true
-
-				// if namespace defined, compare with namespace
-				if len(ops.namespace) > 0 && ns != ops.namespace {
-					matchName = false
-				}
-				// if vnamespace defined, compare with namespace
-				if len(ops.vnamespace) > 0 && ns == ops.vnamespace {
-					matchName = false
-				}
-				// if grep word defined, check about key contains words
-				if len(ops.grep) > 0 && !strings.Contains(key, ops.grep) {
-					matchGrep = false
-				}
-				// if vgrep word defined, check about key contains words
-				if len(ops.vgrep) > 0 && strings.Contains(key, ops.vgrep) {
-					matchGrep = false
-				}
-				if matchName && matchGrep {
-					keys = append(keys, key)
-				}
-			}
-		}
 	}
+
+	keys = checkKeyMatch(allKeys, ops)
 
 	var result []*Item
 
