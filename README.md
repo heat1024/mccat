@@ -1,4 +1,5 @@
 # mccat
+
 terminal base memcached cli client by golang
 
 ## How to use
@@ -10,16 +11,15 @@ terminal base memcached cli client by golang
 ```Shell
 $ go run main.go
 connect to localhost:11211
-localhost:11211> 
+localhost:11211>
 ```
 
 #### run after build
 
 ```Shell
-$ go build -o {name}
 $ ./{name} [example.memcached.com:11211] (default localhost:11211)
 connect to example.memcached.com:11211
-example.memcached.com:11211> 
+example.memcached.com:11211>
 ```
 
 #### show usage
@@ -39,7 +39,7 @@ mccat [URL:PORT] (default server : localhost:11211)
 ```Shell
 # in mccat terminal
 
-localhost:11211> help 
+localhost:11211> help
 Command list
 > get key [key2] [key3] ...                                             : get data from server
 > set key ttl                                                           : set data (overwrite when exist)
@@ -55,62 +55,59 @@ Command list
 
 #### command examples
 
-<details>
-
-<summary>get, set, del commands</summary>
+<details open=true><summary>get, set, del commands</summary>
 
 ```Shell
-localhost:11211> get test 
+localhost:11211> get test
 no values
-localhost:11211> set test 3600 
+localhost:11211> set test 3600
 Test data
 key test set complate
-localhost:11211> get test 
+localhost:11211> get test
 test: Test data
-localhost:11211> del test 
+localhost:11211> del test
 key test deleted
-localhost:11211> get test 
+localhost:11211> get test
 no values
 ```
 
 </details>
 
-<details>
-
-<summary>getall command</summary>
+<details open=true><summary>getall command</summary>
 
 - test data
+
 ```Shell
-localhost:11211> getall 
+localhost:11211> getall
 Key counts: 0
 
-localhost:11211> set test:test1 3600 
+localhost:11211> set test:test1 3600
 namespace test
 key test:test1 set complate
-localhost:11211> set test:2nd 3600   
+localhost:11211> set test:2nd 3600
 namespace test 2nd
 key test:2nd set complate
-localhost:11211> set test:3rd 3600 
+localhost:11211> set test:3rd 3600
 namespace test 3rd
 key test:3rd set complate
-localhost:11211> get test:test1 
+localhost:11211> get test:test1
 test:test1: namespace test
-localhost:11211> get test:2nd   
+localhost:11211> get test:2nd
 test:2nd: namespace test 2nd
-localhost:11211> get test:3rd 
+localhost:11211> get test:3rd
 test:3rd: namespace test 3rd
 ```
 
 - select namespace
 
 ```Shell
-localhost:11211> getall -v 
+localhost:11211> getall -v
 Key counts: 3
   - test:3rd : namespace test 3rd
   - test:2nd : namespace test 2nd
   - test:test1 : namespace test
 
-localhost:11211> getall --name test -v 
+localhost:11211> getall --name test -v
 Key counts: 3
   - test:2nd : namespace test 2nd
   - test:test1 : namespace test
@@ -120,7 +117,7 @@ Key counts: 3
 - grep word in key
 
 ```Shell
-localhost:11211> getall --name test --grep 2nd -v 
+localhost:11211> getall --name test --grep 2nd -v
 Key counts: 1
   - test:2nd : namespace test 2nd
 ```
@@ -128,14 +125,14 @@ Key counts: 1
 - select namespace not match
 
 ```Shell
-localhost:11211> getall --vname test -v 
+localhost:11211> getall --vname test -v
 Key counts: 0
 ```
 
 - select key word not match
 
 ```Shell
-localhost:11211> getall --vgrep 2nd -v 
+localhost:11211> getall --vgrep 2nd -v
 Key counts: 2
   - test:3rd : namespace test 3rd
   - test:test1 : namespace test
