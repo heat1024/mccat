@@ -11,7 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/c-bata/go-prompt"
+	prompt "github.com/c-bata/go-prompt"
+	"github.com/c-bata/go-prompt/completer"
 )
 
 const (
@@ -167,28 +168,12 @@ func usage() {
 	fmt.Println("> add key ttl                                                           : add new data (error when key exist)")
 	fmt.Println("> append key ttl                                                        : append data from exist data")
 	fmt.Println("> prepend key ttl                                                       : prepend data from exist data")
+	fmt.Println("> replace key ttl                                                       : replace data from exist data")
 	fmt.Println("> incr[increase] key number                                             : increase numeric value")
 	fmt.Println("> decr[decrease] key number                                             : decrease numeric value")
 	fmt.Println("> del[delete|rm|remove] key                                             : remove key item from server")
 	fmt.Println("> getall[allitems] [--name namespace] [--grep grep_words] --verbose     : get all items from server (can grep by namespace or key words)")
 	fmt.Println("> help                                                                  : show usage")
-}
-
-func completer(d prompt.Document) []prompt.Suggest {
-	s := []prompt.Suggest{
-		{Text: "get", Description: "Get data from server"},
-		{Text: "set", Description: "Set data (overwrite when exist)"},
-		{Text: "add", Description: "Add new data (error when key exist)"},
-		{Text: "append", Description: "Append data from exist data"},
-		{Text: "prepend", Description: "Prepend data from exist data"},
-		{Text: "incr", Description: "Increase numeric value"},
-		{Text: "decr", Description: "Decrease numeric value"},
-		{Text: "del", Description: "Remove key item from server"},
-		{Text: "getall", Description: "Get all items from server (can grep by namespace or key words)"},
-		{Text: "help", Description: "Show usage"},
-		{Text: "quit", Description: "Terminate the mccat"},
-	}
-	return prompt.FilterHasPrefix(s, d.GetWordBeforeCursor(), true)
 }
 
 // New make connection to provided address:port
@@ -213,6 +198,59 @@ func New(url string) (*Client, error) {
 	return mc, nil
 }
 
+func completerFunc(d prompt.Document) []prompt.Suggest {
+	current := d.GetWordBeforeCursorWithSpace()
+	var s []prompt.Suggest
+
+	if strings.HasPrefix(current, "getall ") || strings.HasPrefix(current, "-") {
+		s = []prompt.Suggest{
+			{Text: "--name", Description: "grep by namespace"},
+			{Text: "--vname", Description: "grep except namespace"},
+			{Text: "--grep", Description: "grep word in whole key name (ex: test -> hoge_test_moge)"},
+			{Text: "--vgrep", Description: "grep word in whole except key name (ex: test -> hoge_moge"},
+			{Text: "--verbose", Description: "diaplay result with value like key : value"},
+		}
+	} else if strings.HasPrefix(current, "set ") ||
+		strings.HasPrefix(current, "add ") ||
+		strings.HasPrefix(current, "append ") ||
+		strings.HasPrefix(current, "prepend ") ||
+		strings.HasPrefix(current, "replace ") ||
+		strings.HasPrefix(current, "set ") {
+		s = []prompt.Suggest{
+			{Text: "[key] [ttl]", Description: "type key name and ttl(sec)"},
+		}
+	} else if strings.HasPrefix(current, "incr ") || strings.HasPrefix(current, "decr ") {
+		s = []prompt.Suggest{
+			{Text: "[key] [numeric]", Description: "type key name and numeric value"},
+		}
+	} else if strings.HasPrefix(current, "del ") {
+		s = []prompt.Suggest{
+			{Text: "[key]", Description: "type key name for delete"},
+		}
+	} else if strings.HasPrefix(current, "get ") {
+		s = []prompt.Suggest{
+			{Text: "[key]", Description: "type key name for get value"},
+		}
+	} else {
+		s = []prompt.Suggest{
+			{Text: "get", Description: "Get data from server"},
+			{Text: "set", Description: "Set data (overwrite when exist)"},
+			{Text: "add", Description: "Add new data (error when key exist)"},
+			{Text: "append", Description: "Append data from exist data"},
+			{Text: "prepend", Description: "Prepend data from exist data"},
+			{Text: "replace", Description: "Replace data from exist data"},
+			{Text: "incr", Description: "Increase numeric value"},
+			{Text: "decr", Description: "Decrease numeric value"},
+			{Text: "del", Description: "Remove key item from server"},
+			{Text: "getall", Description: "Get all items from server (can grep by namespace or key words)"},
+			{Text: "help", Description: "Show usage"},
+			{Text: "exit", Description: "Terminate the mccat"},
+		}
+	}
+
+	return prompt.FilterHasPrefix(s, d.GetWordBeforeCursor(), true)
+}
+
 // Start function is start mccat console
 func Start(url string) error {
 	// connect to memcached server
@@ -225,7 +263,12 @@ func Start(url string) error {
 	defer nc.Close()
 
 	for {
-		cmd := prompt.Input(fmt.Sprintf("%s> ", url), completer)
+		cmd := prompt.Input(fmt.Sprintf("%s> ", url), completerFunc,
+			prompt.OptionTitle(fmt.Sprintf("mccat on %s", url)),
+			prompt.OptionHistory([]string{"SELECT * FROM users;"}),
+			prompt.OptionCompletionWordSeparator(completer.FilePathCompletionSeparator),
+			// prompt.OptionPrefixTextColor(prompt.Black),
+		)
 
 		if len(nc.cmdHisroty) == 0 || nc.cmdHisroty[len(nc.cmdHisroty)-1] != cmd {
 			nc.cmdHisroty = append(nc.cmdHisroty, cmd)
