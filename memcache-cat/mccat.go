@@ -17,7 +17,6 @@ import (
 
 const (
 	defaultTTL = 3600
-	maxBuff    = 3
 )
 
 type cmds struct {
@@ -184,7 +183,16 @@ func New(url string) (*Client, error) {
 		return nil, fmt.Errorf("cannot connect to memcached server: %s", err.Error())
 	}
 
-	nc.SetDeadline(time.Now().Add(time.Duration(defaultTTL) * time.Second))
+	err = nc.(*net.TCPConn).SetKeepAlive(true)
+	if err != nil {
+		return nil, err
+	}
+
+	err = nc.(*net.TCPConn).SetKeepAlivePeriod(30 * time.Second)
+	if err != nil {
+		return nil, err
+	}
+
 	mc := &Client{
 		Conn:       nc,
 		url:        url,
@@ -252,16 +260,7 @@ func completerFunc(d prompt.Document) []prompt.Suggest {
 }
 
 // Start function is start mccat console
-func Start(url string) error {
-	// connect to memcached server
-	fmt.Printf("connect to %s\n", url)
-
-	nc, err := New(url)
-	if err != nil {
-		return fmt.Errorf("cannot connect to server %s", url)
-	}
-	defer nc.Close()
-
+func (c *Client) Start(url string) error {
 	for {
 		cmd := prompt.Input(fmt.Sprintf("%s> ", url), completerFunc,
 			prompt.OptionTitle(fmt.Sprintf("mccat on %s", url)),
@@ -270,8 +269,8 @@ func Start(url string) error {
 			// prompt.OptionPrefixTextColor(prompt.Black),
 		)
 
-		if len(nc.cmdHisroty) == 0 || nc.cmdHisroty[len(nc.cmdHisroty)-1] != cmd {
-			nc.cmdHisroty = append(nc.cmdHisroty, cmd)
+		if len(c.cmdHisroty) == 0 || c.cmdHisroty[len(c.cmdHisroty)-1] != cmd {
+			c.cmdHisroty = append(c.cmdHisroty, cmd)
 		}
 
 		if strings.HasPrefix(strings.ToLower(cmd), "exit") || strings.HasPrefix(strings.ToLower(cmd), "quit") {
@@ -283,15 +282,13 @@ func Start(url string) error {
 			fmt.Println(err.Error())
 		} else {
 			if cmds != nil {
-				if err := nc.Run(cmds); err != nil {
+				if err := c.Run(cmds); err != nil {
 					fmt.Printf("%s\n", err.Error())
 				}
 			}
 		}
 
 	}
-
-	fmt.Printf("terminate mccat\n")
 
 	return nil
 }
@@ -413,6 +410,7 @@ func (c *Client) Run(cmds *cmds) error {
 
 // Close is close Client connection.
 func (c *Client) Close() error {
+	fmt.Println("terminate connection")
 	return c.Conn.Close()
 }
 
@@ -492,7 +490,6 @@ func (c *Client) getKeyListFromLRUCrawler() ([]string, error) {
 	err := c.Write("lru_crawler metadump all")
 	if err != nil {
 		return nil, err
-
 	}
 
 	for {

@@ -31,7 +31,18 @@ func Usage() {
 }
 
 func main() {
-	mccat.Start(url)
+	// connect to memcached server
+	fmt.Printf("connect to memcached server [%s]\n", url)
+
+	nc, err := mccat.New(url)
+	if err != nil {
+		fmt.Printf("cannot connect to server [%s]\n", url)
+
+		os.Exit(1)
+	}
+	defer nc.Close()
+
+	nc.Start(url)
 
 	os.Exit(0)
 }
