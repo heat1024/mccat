@@ -31,10 +31,12 @@ func Usage() {
 }
 
 func main() {
+	historyFile := os.Getenv("HOME") + "/.mccat_history"
+
 	// connect to memcached server
 	fmt.Printf("connect to memcached server [%s]\n", url)
 
-	nc, err := mccat.New(url)
+	nc, err := mccat.New(url, historyFile)
 	if err != nil {
 		fmt.Printf("cannot connect to server [%s]\n", url)
 
@@ -42,7 +44,7 @@ func main() {
 	}
 	defer nc.Close()
 
-	nc.Start(url)
+	nc.Start()
 
 	os.Exit(0)
 }
