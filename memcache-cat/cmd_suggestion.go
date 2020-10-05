@@ -37,14 +37,6 @@ func completerFunc(d prompt.Document) []prompt.Suggest {
 			{Text: "getall --vgrep", Description: "grep word in whole except key name (ex: test -> hoge_moge"},
 			{Text: "getall --verbose", Description: "diaplay result with value like key : value"},
 		}
-	} else if strings.HasPrefix(currentLine, "keycounts ") {
-		s = []prompt.Suggest{
-			{Text: "keycounts --name", Description: "grep by namespace"},
-			{Text: "keycounts --vname", Description: "grep except namespace"},
-			{Text: "keycounts --grep", Description: "grep word in whole key name (ex: test -> hoge_test_moge)"},
-			{Text: "keycounts --vgrep", Description: "grep word in whole except key name (ex: test -> hoge_moge"},
-			{Text: "keycounts --verbose", Description: "diaplay result with value like key : value"},
-		}
 	} else if strings.HasPrefix(currentLine, "set ") {
 		s = []prompt.Suggest{
 			{Text: "set [key] [ttl]", Description: "type key name and ttl(sec)"},
@@ -107,7 +99,7 @@ func completerFunc(d prompt.Document) []prompt.Suggest {
 			{Text: "delete", Description: "Remove key item from server"},
 			{Text: "rm", Description: "Remove key item from server"},
 			{Text: "remove", Description: "Remove key item from server"},
-			{Text: "keycounts", Description: "Get key counts (can grep by namespace or key words)"},
+			{Text: "keycounts", Description: "Get key counts"},
 			{Text: "getall", Description: "Get all items from server (can grep by namespace or key words)"},
 			{Text: "help", Description: "Show usage"},
 			{Text: "exit", Description: "Terminate the mccat"},

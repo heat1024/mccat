@@ -125,6 +125,7 @@ func (c *Client) IncrDecr(cmds *cmds) (string, error) {
 // GetAll return all key/value data in memcached server
 func (c *Client) GetAll(ops options) ([]*Item, uint64, error) {
 	var allKeys, keys []string
+	var result []*Item
 	var SlabIDs []int
 	var keyCounts uint64
 	var err error
@@ -134,22 +135,22 @@ func (c *Client) GetAll(ops options) ([]*Item, uint64, error) {
 		return nil, 0, fmt.Errorf("cannot get slab data from memcached server: %s", err.Error())
 	}
 
-	allKeys, err = c.getKeyListFromCachedump(SlabIDs)
-	if err != nil {
-		return nil, 0, err
-	}
+	if !ops.countOnly {
+		allKeys, err = c.getKeyListFromCachedump(SlabIDs)
+		if err != nil {
+			return nil, 0, err
+		}
 
-	keys = checkKeyMatch(allKeys, ops)
+		keys = checkKeyMatch(allKeys, ops)
 
-	var result []*Item
-
-	for _, key := range keys {
-		if ops.keyOnly {
-			result = append(result, &Item{Key: key})
-		} else {
-			item, err := c.Get(key)
-			if err == nil {
-				result = append(result, item)
+		for _, key := range keys {
+			if ops.keyOnly {
+				result = append(result, &Item{Key: key})
+			} else {
+				item, err := c.Get(key)
+				if err == nil {
+					result = append(result, item)
+				}
 			}
 		}
 	}

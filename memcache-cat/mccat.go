@@ -28,6 +28,7 @@ type options struct {
 	grep       string
 	vgrep      string
 	keyOnly    bool
+	countOnly  bool
 }
 
 // Client is a memcache client.
@@ -57,7 +58,7 @@ func usage() {
 	fmt.Println("> incr[increase] key number                                             : Increase numeric value")
 	fmt.Println("> decr[decrease] key number                                             : Decrease numeric value")
 	fmt.Println("> del[delete|rm|remove] key                                             : Remove key item from server")
-	fmt.Println("> keycounts [--name namespace] [--grep grep_words] --verbose            : Get key counts")
+	fmt.Println("> keycounts                                                             : Get key counts")
 	fmt.Println("> getall [--name namespace] [--grep grep_words] --verbose               : Get almost all items from server (can grep by namespace or key words)")
 	fmt.Println("> help                                                                  : Show usage")
 }

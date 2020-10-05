@@ -17,6 +17,7 @@ func parseCmd(cmd string) (*cmds, error) {
 			grep:       "",
 			vgrep:      "",
 			keyOnly:    true,
+			countOnly:  false,
 		},
 	}
 
@@ -30,9 +31,15 @@ func parseCmd(cmd string) (*cmds, error) {
 	case "get":
 		c.maxArgCount = 0
 		break
-	case "getall", "keycounts":
+	case "getall":
 		c.maxArgCount = 10
 		c.getall = true
+		c.ops.countOnly = false
+		break
+	case "keycounts":
+		c.maxArgCount = 10
+		c.getall = true
+		c.ops.countOnly = true
 		break
 	case "set", "add", "replace", "append", "prepend":
 		c.maxArgCount = 3
