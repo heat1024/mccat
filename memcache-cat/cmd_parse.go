@@ -24,28 +24,30 @@ func parseCmd(cmd string) (*cmds, error) {
 	args := strings.Split(cmd, " ")
 	maxArgs := len(args)
 
-	c.argv = append(c.argv, strings.ToLower(args[0]))
-	cmd = c.argv[0]
+	cmd = strings.ToLower(args[0])
 
 	switch cmd {
 	case "get":
 		c.maxArgCount = 0
 		break
-	case "getall":
+	case "getall", "get_all":
 		c.maxArgCount = 10
 		c.getall = true
-		c.ops.countOnly = false
+		cmd = "getall"
 		break
-	case "keycounts":
-		c.maxArgCount = 10
-		c.getall = true
+	case "keycounts", "key_counts":
+		c.maxArgCount = 1
 		c.ops.countOnly = true
+		cmd = "keycounts"
 		break
+	case "flushall", "flush_all", "flush":
+		c.maxArgCount = 1
+		cmd = "flushall"
 	case "set", "add", "replace", "append", "prepend":
 		c.maxArgCount = 3
 		break
 	case "del", "delete", "rm", "remove":
-		c.maxArgCount = 2
+		c.maxArgCount = 0
 		break
 	case "incr", "increase", "decr", "decrease":
 		c.maxArgCount = 3
@@ -57,6 +59,8 @@ func parseCmd(cmd string) (*cmds, error) {
 	default:
 		return nil, fmt.Errorf("wrong command %s", cmd)
 	}
+
+	c.argv = append(c.argv, cmd)
 
 	if c.maxArgCount > 0 {
 		if maxArgs > c.maxArgCount {

@@ -8,6 +8,26 @@ import (
 	"strings"
 )
 
+func convertTOHumanDigitNumber(num uint64) string {
+	strNum := strconv.FormatUint(num, 10)
+	numOfDigits := len(strNum)
+
+	numOfCommas := (numOfDigits - 1) / 3
+
+	outPut := make([]byte, len(strNum)+numOfCommas)
+
+	for i, j, k := len(strNum)-1, len(outPut)-1, 0; ; i, j = i-1, j-1 {
+		outPut[j] = strNum[i]
+		if i == 0 {
+			return string(outPut)
+		}
+		if k++; k == 3 {
+			j, k = j-1, 0
+			outPut[j] = ','
+		}
+	}
+}
+
 // Get search data by key and return by Item struct
 func (c *Client) Get(key string) (*Item, error) {
 	var value string
@@ -123,39 +143,61 @@ func (c *Client) IncrDecr(cmds *cmds) (string, error) {
 }
 
 // GetAll return all key/value data in memcached server
-func (c *Client) GetAll(ops options) ([]*Item, uint64, error) {
+func (c *Client) GetAll(ops options) error {
 	var allKeys, keys []string
-	var result []*Item
 	var SlabIDs []int
 	var keyCounts uint64
 	var err error
 
 	SlabIDs, keyCounts, err = c.getSlabDataAndKeyCount()
 	if err != nil {
-		return nil, 0, fmt.Errorf("cannot get slab data from memcached server: %s", err.Error())
+		return fmt.Errorf("cannot get slab data from memcached server: %s", err.Error())
 	}
+
+	fmt.Printf("Key counts: %s\n", convertTOHumanDigitNumber(keyCounts))
 
 	if !ops.countOnly {
 		allKeys, err = c.getKeyListFromCachedump(SlabIDs)
 		if err != nil {
-			return nil, 0, err
+			return err
 		}
 
 		keys = checkKeyMatch(allKeys, ops)
 
 		for _, key := range keys {
 			if ops.keyOnly {
-				result = append(result, &Item{Key: key})
+				fmt.Printf("  - %s\n", key)
 			} else {
 				item, err := c.Get(key)
-				if err == nil {
-					result = append(result, item)
+				if err != nil {
+					fmt.Printf("  - %s : %s\n", key, err.Error())
+				} else {
+					fmt.Printf("  - %s : %s\n", item.Key, item.Value)
 				}
 			}
 		}
 	}
 
-	return result, keyCounts, nil
+	return nil
+}
+
+// FlushAll delete all exist keys
+func (c *Client) FlushAll() error {
+	err := c.Write("flush_all")
+	if err != nil {
+		return err
+	}
+
+	buff, err := c.Read()
+	if err != nil && err != io.EOF {
+		return fmt.Errorf("failed on reading response from memcached server: %s", err.Error())
+	}
+
+	if strings.Contains(buff, "ERROR") {
+		return fmt.Errorf("got error on flush all keys from memcached server")
+	}
+
+	return nil
 }
 
 func checkKeyMatch(keys []string, ops options) []string {

@@ -29,13 +29,13 @@ func completerFunc(d prompt.Document) []prompt.Suggest {
 
 	var s []prompt.Suggest
 
-	if strings.HasPrefix(currentLine, "getall ") {
+	if strings.HasPrefix(currentLine, "getall ") || strings.HasPrefix(currentLine, "get_all ") {
 		s = []prompt.Suggest{
-			{Text: "getall --name", Description: "grep by namespace"},
-			{Text: "getall --vname", Description: "grep except namespace"},
-			{Text: "getall --grep", Description: "grep word in whole key name (ex: test -> hoge_test_moge)"},
-			{Text: "getall --vgrep", Description: "grep word in whole except key name (ex: test -> hoge_moge"},
-			{Text: "getall --verbose", Description: "diaplay result with value like key : value"},
+			{Text: "getall --name(-n)", Description: "grep by namespace"},
+			{Text: "getall --vname(-vn)", Description: "grep except namespace"},
+			{Text: "getall --grep(-g)", Description: "grep word in whole key name"},
+			{Text: "getall --vgrep(-vg)", Description: "grep word in whole except key name"},
+			{Text: "getall --verbose(-v)", Description: "diaplay result with value like [key : value]"},
 		}
 	} else if strings.HasPrefix(currentLine, "set ") {
 		s = []prompt.Suggest{
@@ -101,6 +101,7 @@ func completerFunc(d prompt.Document) []prompt.Suggest {
 			{Text: "remove", Description: "Remove key item from server"},
 			{Text: "keycounts", Description: "Get key counts"},
 			{Text: "getall", Description: "Get all items from server (can grep by namespace or key words)"},
+			{Text: "flushall", Description: "Delete all keys"},
 			{Text: "help", Description: "Show usage"},
 			{Text: "exit", Description: "Terminate the mccat"},
 		}

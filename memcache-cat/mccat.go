@@ -57,9 +57,10 @@ func usage() {
 	fmt.Println("> replace key ttl                                                       : Replace data from exist data")
 	fmt.Println("> incr[increase] key number                                             : Increase numeric value")
 	fmt.Println("> decr[decrease] key number                                             : Decrease numeric value")
-	fmt.Println("> del[delete|rm|remove] key                                             : Remove key item from server")
-	fmt.Println("> keycounts                                                             : Get key counts")
-	fmt.Println("> getall [--name namespace] [--grep grep_words] --verbose               : Get almost all items from server (can grep by namespace or key words)")
+	fmt.Println("> del[delete|rm|remove] key [key2] [key3] ...                           : Remove key item from server")
+	fmt.Println("> key_counts                                                            : Get key counts")
+	fmt.Println("> get_all [--name namespace] [--grep grep_words] --verbose              : Get almost all items from server (can grep by namespace or key words)")
+	fmt.Println("> flush_all                                                             : Get key counts")
 	fmt.Println("> help                                                                  : Show usage")
 }
 
@@ -209,36 +210,14 @@ func readValueInput() (string, error) {
 	return strings.TrimRight(buff, "\r\n"), nil
 }
 
-func convertTOHumanDigitNumber(num uint64) string {
-	strNum := strconv.FormatUint(num, 10)
-	numOfDigits := len(strNum)
-
-	numOfCommas := (numOfDigits - 1) / 3
-
-	outPut := make([]byte, len(strNum)+numOfCommas)
-
-	for i, j, k := len(strNum)-1, len(outPut)-1, 0; ; i, j = i-1, j-1 {
-		outPut[j] = strNum[i]
-		if i == 0 {
-			return string(outPut)
-		}
-		if k++; k == 3 {
-			j, k = j-1, 0
-			outPut[j] = ','
-		}
-	}
-}
-
 // Run execute command line
 func (c *Client) Run(cmds *cmds) error {
 	switch cmds.argv[0] {
 	case "keycounts":
-		_, keyCounts, err := c.GetAll(cmds.ops)
+		err := c.GetAll(cmds.ops)
 		if err != nil {
 			return err
 		}
-
-		fmt.Printf("Key counts: %s\n", convertTOHumanDigitNumber(keyCounts))
 
 		break
 	case "get":
@@ -257,19 +236,9 @@ func (c *Client) Run(cmds *cmds) error {
 
 		break
 	case "getall":
-		items, keyCounts, err := c.GetAll(cmds.ops)
+		err := c.GetAll(cmds.ops)
 		if err != nil {
 			return err
-		}
-
-		fmt.Printf("Key counts: %s\n", convertTOHumanDigitNumber(keyCounts))
-
-		for _, i := range items {
-			if cmds.ops.keyOnly {
-				fmt.Printf("  - %s\n", i.Key)
-			} else {
-				fmt.Printf("  - %s : %s\n", i.Key, i.Value)
-			}
 		}
 
 		break
@@ -299,11 +268,25 @@ func (c *Client) Run(cmds *cmds) error {
 
 		break
 	case "del", "delete", "rm", "remove":
-		if err := c.Del(cmds.argv[1]); err != nil {
+		if len(cmds.argv) < 2 {
+			return fmt.Errorf("key must needed")
+		}
+
+		for i := 1; i < len(cmds.argv); i++ {
+			if err := c.Del(cmds.argv[i]); err != nil {
+				return err
+			}
+
+			fmt.Printf("key %s deleted\n", cmds.argv[i])
+		}
+
+		break
+	case "flushall":
+		if err := c.FlushAll(); err != nil {
 			return err
 		}
 
-		fmt.Printf("key %s deleted\n", cmds.argv[1])
+		fmt.Println("All keys deleted")
 
 		break
 	case "incr", "decr":
