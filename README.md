@@ -41,16 +41,19 @@ mccat [URL:PORT] (default server : localhost:11211)
 
 localhost:11211> help
 Command list
-> get key [key2] [key3] ...                                             : get data from server
-> set key ttl                                                           : set data (overwrite when exist)
-> add key ttl                                                           : add new data (error when key exist)
-> append key ttl                                                        : append data from exist data
-> prepend key ttl                                                       : prepend data from exist data
-> incr[increase] key number                                             : increase numeric value
-> decr[decrease] key number                                             : decrease numeric value
-> del[delete|rm|remove] key                                             : remove key item from server
-> getall[allitems] [--name namespace] [--grep grep_words] --verbose     : get all items from server (can grep by namespace or key words)
-> help                                                                  : show usage
+> get key [key2] [key3] ...                                             : Get data from server
+> set key ttl                                                           : Set data (overwrite when exist)
+> add key ttl                                                           : Add new data (error when key exist)
+> append key ttl                                                        : Append data from exist data
+> prepend key ttl                                                       : Prepend data from exist data
+> replace key ttl                                                       : Replace data from exist data
+> incr[increase] key number                                             : Increase numeric value
+> decr[decrease] key number                                             : Decrease numeric value
+> del[delete|rm|remove] key [key2] [key3] ...                           : Remove key item from server
+> key_counts                                                            : Get key counts
+> get_all [--name namespace] [--grep grep_words] --verbose              : Get almost all items from server (can grep by namespace or key words)
+> flush_all                                                             : Get key counts
+> help                                                                  : Show usage
 ```
 
 #### command examples
