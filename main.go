@@ -42,7 +42,7 @@ func main() {
 
 		os.Exit(1)
 	}
-	defer nc.Close()
+	defer nc.Close(false)
 
 	nc.Start()
 

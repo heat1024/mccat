@@ -144,7 +144,6 @@ func (c *Client) IncrDecr(cmds *cmds) (string, error) {
 
 // GetAll return all key/value data in memcached server
 func (c *Client) GetAll(ops options) error {
-	var allKeys, keys []string
 	var SlabIDs []int
 	var keyCounts uint64
 	var err error
@@ -157,24 +156,9 @@ func (c *Client) GetAll(ops options) error {
 	fmt.Printf("Key counts: %s\n", convertTOHumanDigitNumber(keyCounts))
 
 	if !ops.countOnly {
-		allKeys, err = c.getKeyListFromCachedump(SlabIDs)
+		err = c.getKeyListFromCachedump(SlabIDs, ops)
 		if err != nil {
 			return err
-		}
-
-		keys = checkKeyMatch(allKeys, ops)
-
-		for _, key := range keys {
-			if ops.keyOnly {
-				fmt.Printf("  - %s\n", key)
-			} else {
-				item, err := c.Get(key)
-				if err != nil {
-					fmt.Printf("  - %s : %s\n", key, err.Error())
-				} else {
-					fmt.Printf("  - %s : %s\n", item.Key, item.Value)
-				}
-			}
 		}
 	}
 
@@ -200,39 +184,33 @@ func (c *Client) FlushAll() error {
 	return nil
 }
 
-func checkKeyMatch(keys []string, ops options) []string {
-	var matchKey []string
+func checkKeyMatch(key string, ops options) bool {
 	var matchName bool
 	var matchGrep bool
 
-	for _, key := range keys {
-		ns := strings.SplitN(key, ":", 2)[0]
+	ns := strings.SplitN(key, ":", 2)[0]
 
-		matchName = true
-		matchGrep = true
+	matchName = true
+	matchGrep = true
 
-		// if namespace defined, compare with namespace
-		if len(ops.namespace) > 0 && ns != ops.namespace {
-			matchName = false
-		}
-		// if vnamespace defined, compare with namespace
-		if len(ops.vnamespace) > 0 && ns == ops.vnamespace {
-			matchName = false
-		}
-		// if grep word defined, check about key contains words
-		if len(ops.grep) > 0 && !strings.Contains(key, ops.grep) {
-			matchGrep = false
-		}
-		// if vgrep word defined, check about key contains words
-		if len(ops.vgrep) > 0 && strings.Contains(key, ops.vgrep) {
-			matchGrep = false
-		}
-		if matchName && matchGrep {
-			matchKey = append(matchKey, key)
-		}
+	// if namespace defined, compare with namespace
+	if len(ops.namespace) > 0 && ns != ops.namespace {
+		matchName = false
+	}
+	// if vnamespace defined, compare with namespace
+	if len(ops.vnamespace) > 0 && ns == ops.vnamespace {
+		matchName = false
+	}
+	// if grep word defined, check about key contains words
+	if len(ops.grep) > 0 && !strings.Contains(key, ops.grep) {
+		matchGrep = false
+	}
+	// if vgrep word defined, check about key contains words
+	if len(ops.vgrep) > 0 && strings.Contains(key, ops.vgrep) {
+		matchGrep = false
 	}
 
-	return matchKey
+	return matchName && matchGrep
 }
 
 func (c *Client) getSlabDataAndKeyCount() ([]int, uint64, error) {
@@ -283,33 +261,60 @@ func (c *Client) getSlabDataAndKeyCount() ([]int, uint64, error) {
 	return slabIDs, keyCounts, nil
 }
 
-func (c *Client) getKeyListFromCachedump(SlabIDs []int) ([]string, error) {
-	var keys []string
+func (c *Client) getKeyListFromCachedump(SlabIDs []int, ops options) error {
+	var newClient *Client = nil
+	var silent bool = true
+	var err error
+
+	// set new connection when getall with verbose option
+	if !ops.keyOnly {
+		newClient, err = New(c.url, "")
+		if err != nil {
+			os.Stderr.WriteString(fmt.Sprintf("cannot connect to server [%s] for get value\n", c.url))
+			newClient = nil
+		}
+		defer newClient.Close(silent)
+	}
 
 	for _, slab := range SlabIDs {
 		err := c.Write(fmt.Sprintf("stats cachedump %d 0", slab))
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		for {
 			buff, err := c.Read()
 			if err != nil && err != io.EOF {
-				return nil, fmt.Errorf("failed on reading response from memcached server: %s", err.Error())
+				return fmt.Errorf("failed on reading response from memcached server: %s", err.Error())
 			}
 
 			if strings.HasPrefix(buff, "END") {
 				break
 			}
 			if strings.Contains(buff, "ERROR") {
-				return nil, fmt.Errorf("got error on reading response from memcached server")
+				return fmt.Errorf("got error on reading response from memcached server")
 			}
 			if strings.HasPrefix(buff, "ITEM") {
 				key := strings.Split(buff, " ")[1]
-				keys = append(keys, key)
+
+				// if key match with option, print it
+				if checkKeyMatch(key, ops) {
+					if ops.keyOnly {
+						fmt.Printf("  - %s\n", key)
+					} else {
+						if newClient != nil {
+							item, err := newClient.Get(key)
+							if err != nil {
+								fmt.Printf("  - %s : %s\n", key, err.Error())
+							} else {
+								fmt.Printf("  - %s : %s\n", item.Key, item.Value)
+							}
+						}
+					}
+				}
 			}
 		}
 	}
 
-	return keys, nil
+	return nil
 }

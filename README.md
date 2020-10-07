@@ -1,6 +1,6 @@
 # mccat
 
-terminal base memcached cli client by golang
+terminal base memcached cli client
 
 ## How to use
 
@@ -51,7 +51,7 @@ Command list
 > decr[decrease] key number                                             : Decrease numeric value
 > del[delete|rm|remove] key [key2] [key3] ...                           : Remove key item from server
 > key_counts                                                            : Get key counts
-> get_all [--name namespace] [--grep grep_words] --verbose              : Get almost all items from server (can grep by namespace or key words)
+> get_all [--name namespace] [--grep grep_words] --verbose              : Get "almost" all items from server (can grep by namespace or key words)
 > flush_all                                                             : Get key counts
 > help                                                                  : Show usage
 ```

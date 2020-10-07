@@ -59,7 +59,7 @@ func usage() {
 	fmt.Println("> decr[decrease] key number                                             : Decrease numeric value")
 	fmt.Println("> del[delete|rm|remove] key [key2] [key3] ...                           : Remove key item from server")
 	fmt.Println("> key_counts                                                            : Get key counts")
-	fmt.Println("> get_all [--name namespace] [--grep grep_words] --verbose              : Get almost all items from server (can grep by namespace or key words)")
+	fmt.Println("> get_all [--name namespace] [--grep grep_words] --verbose              : Get \"almost\" all items from server (can grep by namespace or key words)")
 	fmt.Println("> flush_all                                                             : Get key counts")
 	fmt.Println("> help                                                                  : Show usage")
 }
@@ -88,6 +88,7 @@ func getServerAddr(url string) string {
 // New make connection to provided address:port
 // and returns a memcache client.
 func New(url string, cmdHistoryFilePath string) (*Client, error) {
+	var historyFile *os.File
 	url = getServerAddr(url)
 
 	nc, err := net.Dial("tcp", fmt.Sprintf("%s", url))
@@ -105,9 +106,13 @@ func New(url string, cmdHistoryFilePath string) (*Client, error) {
 		return nil, err
 	}
 
-	historyFile, err := os.OpenFile(cmdHistoryFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
-	if err != nil {
-		os.Stderr.WriteString(fmt.Sprintf("cannot open mccat history file [%s]: %s. mccat will not store history to file\n", cmdHistoryFilePath, err.Error()))
+	if cmdHistoryFilePath != "" {
+		historyFile, err = os.OpenFile(cmdHistoryFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
+		if err != nil {
+			os.Stderr.WriteString(fmt.Sprintf("cannot open mccat history file [%s]: %s. mccat will not store history to file\n", cmdHistoryFilePath, err.Error()))
+			historyFile = nil
+		}
+	} else {
 		historyFile = nil
 	}
 
@@ -314,8 +319,10 @@ func (c *Client) Run(cmds *cmds) error {
 }
 
 // Close is close Client connection.
-func (c *Client) Close() error {
-	fmt.Println("exit mccat terminal")
+func (c *Client) Close(silent bool) error {
+	if !silent {
+		fmt.Println("exit mccat terminal")
+	}
 
 	if c.historyFile != nil {
 		if err := c.historyFile.Close(); err != nil {
