@@ -153,9 +153,9 @@ func (c *Client) GetAll(ops options) error {
 		return fmt.Errorf("cannot get slab data from memcached server: %s", err.Error())
 	}
 
-	fmt.Printf("Key counts: %s\n", convertTOHumanDigitNumber(keyCounts))
-
-	if !ops.countOnly {
+	if ops.countOnly {
+		fmt.Printf("Key counts: %s\n", convertTOHumanDigitNumber(keyCounts))
+	} else {
 		err = c.getKeyListFromCachedump(SlabIDs, ops)
 		if err != nil {
 			return err
