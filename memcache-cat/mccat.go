@@ -68,6 +68,13 @@ func getServerAddr(url string) string {
 	var port int
 	var err error
 
+	if strings.HasPrefix(url, "sock://") || strings.HasSuffix(url, ".sock") {
+		return strings.TrimPrefix(url, "sock://")
+	}
+
+	if strings.HasPrefix(url, "tcp://") {
+		url = strings.TrimPrefix(url, "tcp://")
+	}
 	addr := strings.SplitN(url, ":", 2)
 	if len(addr) != 2 {
 		fmt.Println("connect to default port(11211)")
@@ -85,23 +92,43 @@ func getServerAddr(url string) string {
 	return fmt.Sprintf("%s:%d", addr[0], port)
 }
 
+func createConn(url string) (net.Conn, error) {
+	var nc net.Conn
+	var err error
+
+	url = getServerAddr(url)
+
+	if strings.HasSuffix(url, ".sock") {
+		nc, err = net.Dial("unix", url)
+		if err != nil {
+			return nil, fmt.Errorf("cannot connect to memcached socket: %s", err.Error())
+		}
+	} else {
+		nc, err = net.Dial("tcp", url)
+		if err != nil {
+			return nil, fmt.Errorf("cannot connect to memcached server: %s", err.Error())
+		}
+
+		err = nc.(*net.TCPConn).SetKeepAlive(true)
+		if err != nil {
+			return nil, err
+		}
+
+		err = nc.(*net.TCPConn).SetKeepAlivePeriod(30 * time.Second)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return nc, nil
+}
+
 // New make connection to provided address:port
 // and returns a memcache client.
 func New(url string, cmdHistoryFilePath string) (*Client, error) {
 	var historyFile *os.File
-	url = getServerAddr(url)
 
-	nc, err := net.Dial("tcp", fmt.Sprintf("%s", url))
-	if err != nil {
-		return nil, fmt.Errorf("cannot connect to memcached server: %s", err.Error())
-	}
-
-	err = nc.(*net.TCPConn).SetKeepAlive(true)
-	if err != nil {
-		return nil, err
-	}
-
-	err = nc.(*net.TCPConn).SetKeepAlivePeriod(30 * time.Second)
+	nc, err := createConn(url)
 	if err != nil {
 		return nil, err
 	}
@@ -197,7 +224,7 @@ func calcTTL(ttl string) int {
 
 	t, err := strconv.Atoi(ttl)
 	if err != nil {
-		fmt.Printf("ttl is wrong. use default ttl (%d)\n", defaultTTL)
+		os.Stderr.WriteString(fmt.Sprintf("ttl is wrong. use default ttl (%d).\n", defaultTTL))
 		return defaultTTL
 	}
 
@@ -259,6 +286,8 @@ func (c *Client) Run(cmds *cmds) error {
 		} else {
 			ttl = calcTTL(cmds.argv[2])
 		}
+
+		fmt.Printf("input value> ")
 
 		value, err := readValueInput()
 		if err != nil {
