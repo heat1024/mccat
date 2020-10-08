@@ -25,7 +25,11 @@ func init() {
 // Usage show simple manual
 func Usage() {
 	fmt.Println("How to use mccat(memcached cat)")
-	fmt.Println("mccat [URL:PORT] (default server : localhost:11211)")
+	fmt.Println("--------------------------------------------------------------------")
+	fmt.Println("- when connect to tcp server (default)")
+	fmt.Println("   $ mccat [tcp://]URL:PORT (default : localhost:11211)")
+	fmt.Println("- when connect to unix socket")
+	fmt.Println("   $ mccat [unix://]PATH")
 	fmt.Println()
 	fmt.Println("  --help [-h]               : show usage")
 }
@@ -38,7 +42,7 @@ func main() {
 
 	nc, err := mccat.New(url, historyFile)
 	if err != nil {
-		fmt.Printf("cannot connect to server [%s]\n", url)
+		os.Stderr.WriteString(fmt.Sprintf("cannot connect to server [%s]: %s\n", url, err.Error()))
 
 		os.Exit(1)
 	}
