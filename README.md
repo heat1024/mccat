@@ -2,6 +2,14 @@
 
 terminal base memcached cli client
 
+## Installation
+
+Use `go get` for install
+
+```
+$ go get github.com/heat1024/mccat
+```
+
 ## How to use
 
 ### Run CLI mode
